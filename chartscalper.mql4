@@ -1,0 +1,252 @@
+// How it works
+// Capturing trade every hour.
+// Detect chart direction and open the position accordingly.
+// Recommended to be used on 1HR chart
+// Working model don't change it!
+// https://docs.google.com/document/d/1ZMHxLIs5Uu42q8RouatxwGGLkTODMfNQRzGboSfDGyM/edit?usp=sharing
+
+#property copyright "Copyright 2018, Market Intelligence Corp"
+#property link      "https://marketitelligence.ml/"
+#property version   "58.00"
+#property strict
+
+
+input string         UsefulFunction ="Useful Function";
+input int            MagicNumber  = 1982;     //Magic Number
+input double         Lots         = 0.05;     //Fixed Lots
+input double         StopLoss     = 30;      //Fixed Stop Loss (in Points)
+input double         TakeProfit   = 0;      //Fixed Take Profit (in Points)
+input int            TrailingStop = 5;       //Trailing Stop (in Points)
+input double         Waiting_Time = 3600;    // Waiting time (In Seconds)
+
+
+
+
+input string      aaaaaaaaaa="* EA & Broker Settings:";
+input bool        Market_Execution=true;   // ECN, NDD etc
+input bool        Write_Journal=true; // Intelligence Journal
+
+input string      Trade_Hours="* Time Intelligence: (Please do not touch)";
+input int         Morning_Start=10;     // AI Time 1
+input int         Morning_End= 13;     // AI Time 2
+input int         Evening_Start = 15;  // AI Time 3
+input int         Evening_End =20;     //AI Time 4
+
+
+
+int    Slippage=0;
+
+
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+   Print("You're using Market Intelligence Software");
+  }
+//+------------------------------------------------------------------+
+//|   expert OnTick function                                         |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+   double TheStopLoss=0;
+   double TheTakeProfit=0;
+   double MyPoint=Point;
+   double Current_Hour = Hour();
+   int i =OrdersHistoryTotal()-1;
+   OrderSelect(i,SELECT_BY_POS,MODE_HISTORY);
+   int Previoustime =OrderCloseTime();
+   int CurrentTime =TimeCurrent();
+   double TimeDifference =CurrentTime-Previoustime;
+   int preprofit =OrderProfit();
+
+
+   if(Digits==3 || Digits==5) MyPoint=Point*10;
+   
+//+------------------------------------------------------------------+
+//|              BARS SETTINGS                                       |
+//+------------------------------------------------------------------+
+ double bar0_open = iOpen(NULL,0,0);
+ double bar1_open = iOpen(NULL,0,1);
+ double bar2_open = iOpen(NULL,0,2);
+ 
+ double bar0_close =iClose(NULL,0,0); // Obsolete ?
+ double bar1_close =iClose(NULL,0,1);
+ double bar2_close =iClose(NULL,0,2);
+ 
+//+------------------------------------------------------------------+
+//|              GENERAL COMMENT OF WHAT'S GOING ON                  |
+//+------------------------------------------------------------------+
+ 
+Comment(" Current Server Time ", Current_Hour, " Previously Profited", preprofit, " Bar 1 Open Value ", bar1_open, " Bar 1 Close Value ", bar1_close,  " Bar 0 Open Value ", bar0_open);
+   
+//+------------------------------------------------------------------+
+//|              BARS SETTINGS ENDS                                  |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//|              NEW CANDLE FUNCTION                                 |
+//+------------------------------------------------------------------+
+
+if(IsNewCandle())
+
+   {
+
+//+------------------------------------------------------------------+
+//|              TRADE FUNCTION STARTS                               |
+//+------------------------------------------------------------------+
+
+   if(TotalOrdersCount()==0)
+     {
+      int result=0;
+      
+      
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~BUY~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      if(bar1_close<bar0_open) 
+      
+        {
+
+                     result=OrderSend(Symbol(),OP_BUY,Lots,Ask,Slippage,0,0,"Buy Frankfurt",MagicNumber,0,clrAliceBlue);
+               
+
+                        if(result>0)
+                           
+                           {
+                              
+                              TheStopLoss=0;
+                              TheTakeProfit=0;
+                              if(TakeProfit > 0) TheTakeProfit = Ask + TakeProfit * MyPoint;
+                              if(StopLoss > 0)   TheStopLoss   = Ask - StopLoss * MyPoint;
+                              int MyOrderSelect = OrderSelect(result,SELECT_BY_TICKET);
+                              int MyOrderModify = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(TheStopLoss,Digits),
+                                                  NormalizeDouble(TheTakeProfit,Digits),0,Green);
+                           }
+   
+        }
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SELL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      
+      if(bar1_close>bar0_open)
+      
+        {
+                
+                        result=OrderSend(Symbol(),OP_SELL,Lots,Bid,Slippage,0,0,"Sell Frankfurt",MagicNumber,0,clrDarkRed);
+               
+
+                              if(result>0)
+                              
+                                 {
+                                    TheStopLoss=0;
+                                    TheTakeProfit=0;
+                                    if(TakeProfit > 0) TheTakeProfit = Bid - TakeProfit * MyPoint;
+                                    if(StopLoss > 0)   TheStopLoss   = Bid + StopLoss * MyPoint;
+                                    int MyOrderSelect = OrderSelect(result,SELECT_BY_TICKET);
+                                    int MyOrderModify = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(TheStopLoss,Digits),
+                                                  NormalizeDouble(TheTakeProfit,Digits),0,Green);
+                                 }
+
+               
+           
+        }
+
+   
+
+      
+//+------------------------------------------------------------------+
+//|              TRADE FUNCTION STARTS                               |
+//+------------------------------------------------------------------+
+
+   }
+  
+//+------------------------------------------------------------------+
+//|              NEW CANDLE FUNCTION ENDS                            |
+//+------------------------------------------------------------------+
+  
+  }
+  
+//+------------------------------------------------------------------+
+//|              MAIN ENTRY FUNCTION ENDS                            |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//|              TRAILLING STOP FUNCTION                             |
+//+------------------------------------------------------------------+
+
+   for(int cnt=0; cnt<OrdersTotal(); cnt++)
+     {
+      int MyOrderSelect=OrderSelect(cnt,SELECT_BY_POS,MODE_TRADES);
+      if(OrderType()<=OP_SELL && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNumber)
+        {
+         if(OrderType()==OP_BUY)
+           {
+       
+
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CLOSING BUY~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+            //------------------------------+
+            // TRAILING STOP CODE HERE:     +
+            //------------------------------+
+            if(TrailingStop>0)
+              {
+               if(Bid-OrderOpenPrice()>MyPoint*TrailingStop)
+                 {
+                  if(OrderStopLoss()<Bid-MyPoint*TrailingStop)
+                    {
+                     int MyOrderModify=OrderModify(OrderTicket(),OrderOpenPrice(),
+                                                   OrderStopLoss()+TrailingStop*MyPoint,OrderTakeProfit(),0,Green);
+                    }
+                 }
+              }
+           }
+         else
+           {
+
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CLOSING SELL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+            //------------------------------+
+            // TRAILING STOP CODE HERE:     +
+            //------------------------------+
+            if(TrailingStop>0)
+              {
+               if((OrderOpenPrice()-Ask)>(MyPoint*TrailingStop))
+                 {
+                  if((OrderStopLoss()>(Ask+MyPoint*TrailingStop)) || (OrderStopLoss()==0))
+                    {
+                     int MyOrderModify=OrderModify(OrderTicket(),OrderOpenPrice(),
+                                                   OrderStopLoss()-MyPoint*TrailingStop,OrderTakeProfit(),0,Red);
+                    }
+                 }
+              }
+           }
+        }
+     }
+  }
+//+------------------------------------------------------------------+
+//|   expert TotalOrdersCount function                               |
+//+------------------------------------------------------------------+
+int TotalOrdersCount()
+  {
+   int result=0;
+
+   for(int i=0; i<OrdersTotal(); i++)
+     {
+      int MyOrderSelect=OrderSelect(i,SELECT_BY_POS,MODE_TRADES);
+      if(OrderMagicNumber()==MagicNumber) result++;
+     }
+
+//---
+   return (result);
+  }
+//-------------------------------------------------------------------+
+//Bye
+bool IsNewCandle()
+   {
+   
+     static datetime saved_candle_time;
+     if(Time[0]==saved_candle_time)
+         return false;
+     else
+        saved_candle_time=Time[0];
+     return true;
+    
+    }
