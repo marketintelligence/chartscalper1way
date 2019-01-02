@@ -1,0 +1,265 @@
+// Documentation: https://docs.google.com/document/d/1BxTntAepBE2qvHs6lUoLFU64QVBofT2qAU0j-PBdGa8/edit?usp=sharing
+
+
+#property copyright "Copyright 2018, Market Intelligence."
+#property link      "https://www.market-intelligence.ml/"
+#property version   "1.00"
+#property strict
+
+//--- Useful information --//
+
+input string    UsefulFuctions   ="Useful Functions";
+input int       hourly           = 60;       // Hourly Chart Value
+input double    lots             = 0.05;     // Lot Size
+input int       magic1           = 1991;     // Magic Numeber 1
+input int       slipage          = 0;        // Slipage
+input int       Waiting_Time     = 3600;     // Waiting Time
+input int       TrailingStop     = 5;        // Traling Stop (In Pips)
+input int       TakeProfit       = 0;        // Take Profit Value
+input int       StopLoss         = 30;        // Stop Loss Level (In Pips)
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+  
+
+   
+//---
+   return(INIT_SUCCEEDED);
+  }
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+//---
+   
+  }
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+  
+double buyprice   =  Ask;
+double sellprice  =  Bid;
+
+  
+//-- Open Bars --//
+  
+ double bar0_open = iOpen(NULL,0,0);
+ double bar1_open = iOpen(NULL,0,1);
+ double bar2_open = iOpen(NULL,0,2);
+ 
+ double bar0_close =iClose(NULL,0,0); // Obsolete ?
+ double bar1_close =iClose(NULL,0,1);
+ double bar2_close =iClose(NULL,0,2);
+ 
+//-- Open Bars Ends --//
+//-- High and Low Scalping Needs --//
+
+ double highest_1 =High[0];
+ double highest_0 =High[1];
+ 
+ double lowest_1 =Low[1];
+ double lowest_0 =Low[0];
+
+//-- High and Low Scalping Needs Ends--//
+
+//-- Time Difference --//
+
+   double TheStopLoss=0;
+   double TheTakeProfit=0;
+   double MyPoint=Point;
+   double Current_Hour = Hour();
+   int i =OrdersHistoryTotal()-1;
+   OrderSelect(i,SELECT_BY_POS,MODE_HISTORY);
+   int Previoustime =OrderCloseTime();
+   int CurrentTime =TimeCurrent();
+   double TimeDifference =CurrentTime-Previoustime;
+   
+//-- Check if 5 Digit Broker --//
+   
+      if(Digits==3 || Digits==5) MyPoint=Point*10;
+      
+//-- Check if 5 Digit Broker Ends --//
+   
+//-- Time Difference Ends --//
+
+
+                                          
+//+------------------------------------------------------------------+
+//|              TRAILLING STOP FUCTION                              |
+//+------------------------------------------------------------------+
+
+   for(int cnt=0; cnt<OrdersTotal(); cnt++)
+     {
+      int MyOrderSelect=OrderSelect(cnt,SELECT_BY_POS,MODE_TRADES);
+      if(OrderType()<=OP_SELL && OrderSymbol()==Symbol() && OrderMagicNumber()==magic1)
+        {
+         if(OrderType()==OP_BUY)
+           {
+           
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CLOSING BUY~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            //------------------------------+
+            // TRAILING STOP CODE HERE:     +
+            //------------------------------+
+            if(TrailingStop>0)
+              {
+               if(Bid-OrderOpenPrice()>MyPoint*TrailingStop)
+                 {
+                  if(OrderStopLoss()<Bid-MyPoint*TrailingStop)
+                    {
+                     int MyOrderModify=OrderModify(OrderTicket(),OrderOpenPrice(),
+                                                   OrderStopLoss()+TrailingStop*MyPoint,OrderTakeProfit(),0,clrRed);
+                    }
+                 }
+              }
+           }
+         else
+           {
+
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CLOSING SELL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            //------------------------------+
+            // TRAILING STOP CODE HERE:     +
+            //------------------------------+
+            if(TrailingStop>0)
+              {
+               if((OrderOpenPrice()-Ask)>(MyPoint*TrailingStop))
+                 {
+                  if((OrderStopLoss()>(Ask+MyPoint*TrailingStop)) || (OrderStopLoss()==0))
+                    {
+                     int MyOrderModify=OrderModify(OrderTicket(),OrderOpenPrice(),
+                                                   OrderStopLoss()-MyPoint*TrailingStop,OrderTakeProfit(),0,clrBlueViolet);
+                    }
+                 }
+              }
+           }
+        }
+     }
+                                          
+// -- Sequence of a Trend -- //
+
+
+// bar2_close == bar2_open == bar1_close == bar1_open == bar0_close == bar0_open
+
+// -- Entry Rules -- //
+
+// if (Current Price == bar1_close eter a trade)
+//+------------------------------------------------------------------+
+//|              Every New Candle                                    |
+//+------------------------------------------------------------------+
+          
+
+
+//+------------------------------------------------------------------+
+//|              Limit To Only One Trade                             |
+//+------------------------------------------------------------------+
+
+   if(OrdersTotal()==0)
+     {
+
+//+------------------------------------------------------------------+
+//|              MAIN ENTRY FUNCTION                                 |
+//+------------------------------------------------------------------+
+
+            if((highest_0<buyprice)&&(highest_1<buyprice)) // A Buy Function
+  
+               {
+               
+               if(IsNewCandle())
+               
+                  {            
+                  
+                RefreshRates();
+                
+                Comment(" Current Server Time ", Current_Hour, " It's an Order Buy ", " Bar 1 Open Value ", bar1_open, " Bar 1 Close Value ", bar1_close,  " Bar 0 Open Value ", bar0_open);
+
+                OrderSend(NULL,OP_BUY,lots,buyprice,slipage,StopLoss,TakeProfit," Order Buy",magic1,0,clrRed);
+                                
+                if(OrdersTotal()>0)
+                           
+                           {
+                              
+                              TheStopLoss=0;
+                              TheTakeProfit=0;
+                              if(TakeProfit > 0) TheTakeProfit = Ask + TakeProfit * MyPoint;
+                              if(StopLoss > 0)   TheStopLoss   = Ask - StopLoss * MyPoint;
+                              int MyOrderSelect = OrderSelect(OrderTicket(),SELECT_BY_TICKET);
+                              int MyOrderModify = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(TheStopLoss,Digits),
+                                                  NormalizeDouble(TheTakeProfit,Digits),0,Green);
+                           }
+                
+                  }
+               }
+   
+            if((lowest_1>sellprice)&&(lowest_0>sellprice)) // A Sell Function
+  
+               {
+               
+               if(IsNewCandle())
+               
+               
+               {
+               
+               RefreshRates();
+               
+               Comment(" Current Server Time ", Current_Hour, " It's an Order Sell ", " Bar 1 Open Value ", bar1_open, " Bar 1 Close Value ", bar1_close,  " Bar 0 Open Value ", bar0_open);
+               
+               OrderSend(NULL,OP_SELL,lots,sellprice,slipage,StopLoss,TakeProfit," Order Sell",magic1,0,clrBlueViolet);
+                                    
+               if(OrdersTotal()>0)
+                           
+                           {
+                              
+                              TheStopLoss=0;
+                              TheTakeProfit=0;
+                              if(TakeProfit > 0) TheTakeProfit = Ask + TakeProfit * MyPoint;
+                              if(StopLoss > 0)   TheStopLoss   = Ask - StopLoss * MyPoint;
+                              int MyOrderSelect = OrderSelect(OrderTicket(),SELECT_BY_TICKET);
+                              int MyOrderModify = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(TheStopLoss,Digits),
+                                                  NormalizeDouble(TheTakeProfit,Digits),0,Green);
+                           }
+                }
+                
+               }
+           }
+      }
+//+------------------------------------------------------------------+
+//|              Every New Candle Ends                               |
+//+------------------------------------------------------------------+
+     
+
+  
+  
+//+------------------------------------------------------------------+
+//|              OnTick() Function Ends                              |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//|              Trade Every New Candle                              |
+//+------------------------------------------------------------------+
+
+bool IsNewCandle()
+   {
+   
+     static datetime saved_candle_time;
+     if(Time[0]==saved_candle_time)
+         return false;
+     else
+        saved_candle_time=Time[0];
+     return true;
+    
+    }
+    
+//+------------------------------------------------------------------+
+//|              Trade Every New Candle Ends                         |
+//+------------------------------------------------------------------+
+    
+  
+  
+  
+//+------------------------------------------------------------------+
